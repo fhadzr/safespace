@@ -472,7 +472,7 @@ elif st.session_state.page == "name_gate":
     <div class="app-header">
       <div class="app-logo">
         <span style="font-size: 1.2rem;">🛡️</span>
-        <span>RK SafeSpace</span>
+        <span>SafeSpace</span>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -512,7 +512,7 @@ else:
     <div class="app-header">
       <div class="app-logo">
         <span style="font-size: 1.2rem;">🛡️</span>
-        <span>RK SafeSpace</span>
+        <span>SafeSpace</span>
       </div>
       {greeting}
       <div class="app-alert">🔔</div>
