@@ -1,3 +1,4 @@
+from asyncio import coroutines
 import time
 import streamlit as st
 import streamlit.components.v1 as components
@@ -335,12 +336,21 @@ def ai_response(msg, hist):
             "temperature": 0.5,
             "max_tokens": 512
         }
-        res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=10)
         
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=10
+        )
+
+        print("Status Code:", res.status_code)
+        print("Response:", res.text)
+
         if res.status_code == 200:
             return res.json()["choices"][0]["message"]["content"].strip()
         else:
-            print(f"[Safe Support AI] Groq API Error: {res.status_code} - {res.text}")
+            print(f"[Safe Support AI] Groq API Error: {res.status_code}")
             return fallback(msg)
             
     except Exception as e:
