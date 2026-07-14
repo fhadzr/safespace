@@ -226,7 +226,7 @@ QUESTIONS = [
     "Pasangan saya mengancam akan menyakiti orang yang saya sayangi.",
     "Saya merasa tidak punya tempat untuk melarikan diri jika hubungan ini memburuk.",
 ]
-OPTIONS = [("Sangat Tidak Setuju", 0), ("Tidak Setuju", 1), ("Setuju", 2), ("Sangat Setuju", 3)]
+OPTIONS = [("Sangat Tidak Setuju", 1), ("Tidak Setuju", 2), ("Setuju", 3), ("Sangat Setuju", 4)]
 RECS = {
     "low": [
         ("🛡️","Tetap saling percaya","Kepercayaan adalah fondasi utama hubungan yang damai. Pertahankan komunikasi yang terbuka dan jujur."),
@@ -288,11 +288,18 @@ def reset():
 
 def calc_score(a): return sum(a.values())
 
-def get_cat(s):
-    m = len(QUESTIONS)*3
-    if s <= m*0.33: return "low","Risiko Rendah","badge-low"
-    elif s <= m*0.66: return "medium","Risiko Sedang","badge-medium"
-    else: return "high","Risiko Tinggi","badge-high"
+def get_cat(score):
+    if 24 <= score <= 48:
+        return "low", "Risiko Rendah", "badge-low"
+
+    elif 49 <= score <= 72:
+        return "medium", "Risiko Sedang", "badge-medium"
+
+    elif 73 <= score <= 96:
+        return "high", "Risiko Tinggi", "badge-high"
+
+    else:
+        return "unknown", "Skor Tidak Valid", "badge-default"
 
 def get_msg(cat):
     msgs = {
