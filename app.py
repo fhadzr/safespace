@@ -149,13 +149,13 @@ button.jelajahi-btn:hover {
 .badge-medium { background:#FFF3E0; color:#EF6C00; }
 .badge-high { background:#FFEBEE; color:#C62828; }
 
-/* RECOMMENDATION LIST — Fixed unified card */
-.rec-list { background:#fff; border:1px solid #F0E8ED; border-radius:16px; overflow:hidden; margin-bottom:12px; }
-.rec-row { display:flex; gap:12px; padding:14px 16px; align-items:flex-start; border-bottom:1px solid #F5EFF2; }
-.rec-row:last-child { border-bottom:none; }
-.rec-icon { font-size: 1.4rem; line-height: 1; flex-shrink: 0; margin-top: 2px; }
-.rec-content h4 { font-size:.9rem; color:#1a1a1a; margin:0 0 3px 0; }
-.rec-content p { font-size:.82rem; color:#666; line-height:1.5; margin:0; }
+/* RECOMMENDATION LIST — Grid layout */
+.rec-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 24px; }
+.rec-row { background:#fff; border:1px solid #F0E8ED; border-radius:16px; padding:14px 12px; display:flex; flex-direction:column; gap:8px; align-items:flex-start; text-align:left; box-shadow:0 2px 8px rgba(107,15,58,.02); transition: all 0.2s; }
+.rec-row:hover { transform: translateY(-2px); box-shadow:0 4px 12px rgba(107,15,58,.06); border-color:#E91E8C; }
+.rec-icon { font-size: 1.8rem; line-height: 1; flex-shrink: 0; }
+.rec-content h4 { font-size:.85rem; font-weight:700; color:#1a1a1a; margin:0 0 4px 0; line-height:1.2; }
+.rec-content p { font-size:.75rem; color:#666; line-height:1.4; margin:0; }
 
 /* HELP LIST — Fixed for Resources page */
 .help-list { background:#fff; border:1px solid #F0E8ED; border-radius:16px; overflow:hidden; margin-bottom:12px; }
@@ -301,26 +301,50 @@ def get_msg(cat):
     }
     return msgs[cat]
 
+import requests
+
 def ai_response(msg, hist):
     try:
-        import google.generativeai as genai
-        key = st.secrets.get("GEMINI_API_KEY","")
-        if not key: return fallback(msg)
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        key = st.secrets.get("GROQ_API_KEY", "")
+        if not key: 
+            print("[Safe Support AI] GROQ_API_KEY not found in secrets.")
+            return fallback(msg)
+        
         ctx = ""
         if st.session_state.screening_done:
             s = calc_score(st.session_state.answers)
             _, cl, _ = get_cat(s)
-            ctx = f"\nKonteks skrining: {cl} (skor {s})."
-        name_ctx = f"\nNama pengguna: {st.session_state.user_name}." if st.session_state.user_name else ""
-        prompt = f"Kamu adalah Safe Support AI. Nada hangat, empati, singkat 3-4 paragraf.\nJika kekerasan/ancaman: sertakan 112 atau 119 (KemenPPPA).{ctx}{name_ctx}\nRiwayat:\n"
+            ctx = f" Konteks skrining: {cl} (skor {s})."
+        name_ctx = f" Nama pengguna: {st.session_state.user_name}." if st.session_state.user_name else ""
+        
+        sys_prompt = f"Kamu adalah Safe Support AI. Nada hangat, penuh empati, dan berikan jawaban yang singkat (maksimal 2-3 paragraf pendek). Jika mendeteksi tanda kekerasan atau ancaman, wajib sertakan 112 atau 119 (KemenPPPA).{ctx}{name_ctx}"
+        
+        messages = [{"role": "system", "content": sys_prompt}]
         for m in hist[-6:]:
-            prompt += f"{'Pengguna' if m['role']=='user' else 'AI'}: {m['content']}\n"
-        prompt += f"Pengguna: {msg}\nAI:"
-        return model.generate_content(prompt).text.strip()
+            role = "user" if m["role"] == "user" else "assistant"
+            messages.append({"role": role, "content": m["content"]})
+        messages.append({"role": "user", "content": msg})
+
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "llama3-8b-8192", 
+            "messages": messages,
+            "temperature": 0.5,
+            "max_tokens": 512
+        }
+        res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=10)
+        
+        if res.status_code == 200:
+            return res.json()["choices"][0]["message"]["content"].strip()
+        else:
+            print(f"[Safe Support AI] Groq API Error: {res.status_code} - {res.text}")
+            return fallback(msg)
+            
     except Exception as e:
-        print(f"[Safe Support AI] Gemini call failed, using fallback: {e}")
+        print(f"[Safe Support AI] API call failed, using fallback: {e}")
         return fallback(msg)
 
 def fallback(msg):
@@ -592,13 +616,15 @@ else:
             )
             st.markdown(f'<div class="rec-list">{rec_rows}</div>', unsafe_allow_html=True)
 
-            st.markdown('<div class="disclaimer-banner">⚠️ <strong>Disclaimer:</strong> Bukan alat diagnosis medis. Jika dalam bahaya, hubungi layanan darurat.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="disclaimer-banner" style="margin-bottom: 24px;">⚠️ <strong>Disclaimer:</strong> Bukan alat diagnosis medis. Jika dalam bahaya, hubungi layanan darurat.</div>', unsafe_allow_html=True)
 
             cr, ca = st.columns(2)
             with cr:
                 if st.button("🔄 Ulangi", type="secondary", use_container_width=True): reset()
             with ca:
                 if st.button("🤖 Support AI", type="primary", use_container_width=True): set_page("chat")
+                
+            st.markdown('<div style="height: 16px;"></div>', unsafe_allow_html=True)
 
             # Save history
             if not st.session_state.history or st.session_state.history[-1].get("score") != sc or st.session_state.history[-1].get("timestamp","")[:16] != datetime.now().strftime("%Y-%m-%d %H:%M"):
@@ -630,18 +656,30 @@ else:
                 bubbles = "".join(parts)
             st.markdown(f'<div class="chat-window">{bubbles}</div>', unsafe_allow_html=True)
 
-            with st.form(key="chat_form", clear_on_submit=True):
-                ci, cs = st.columns([6,1])
-                with ci:
-                    ui = st.text_input("Tulis pesan...", key="chat_in", label_visibility="collapsed", placeholder="Tulis ceritamu di sini...")
-                with cs:
-                    sent = st.form_submit_button("➤", use_container_width=True, type="primary")
+            user_msg_count = sum(1 for m in st.session_state.chat_history if m.get("role") == "user")
+            
+            if user_msg_count >= 2:
+                st.markdown('<div class="disclaimer-banner" style="background:linear-gradient(90deg,#FFEBEE,#FFCDD2); border-left:4px solid #C62828; color:#B71C1C; margin-top: 12px;"><strong>Sesi cerita mencapai batas maksimal.</strong><br>Untuk perlindungan dan penanganan terbaik, kami sarankan Anda bertemu dengan tenaga profesional.<br>Silakan buka tab <b>Resources</b> atau segera hubungi:<br>🚨 <b>112</b> (Darurat)<br>🚨 <b>119</b> (KemenPPPA)</div>', unsafe_allow_html=True)
+            else:
+                with st.form(key="chat_form", clear_on_submit=True):
+                    ci, cs = st.columns([6,1])
+                    with ci:
+                        ui = st.text_input("Tulis pesan...", key="chat_in", label_visibility="collapsed", placeholder="Tulis ceritamu di sini...")
+                    with cs:
+                        sent = st.form_submit_button("➤", use_container_width=True, type="primary")
 
-            if sent and ui.strip():
-                st.session_state.chat_history.append({"role":"user","content":ui.strip(),"time":datetime.now().strftime("%H:%M")})
-                resp = ai_response(ui.strip(), st.session_state.chat_history)
-                st.session_state.chat_history.append({"role":"assistant","content":resp,"time":datetime.now().strftime("%H:%M")})
-                st.rerun()
+                if sent and ui.strip():
+                    st.session_state.chat_history.append({"role":"user","content":ui.strip(),"time":datetime.now().strftime("%H:%M")})
+                    
+                    user_msg_count += 1
+                    if user_msg_count == 2:
+                        resp = ai_response(ui.strip(), st.session_state.chat_history[:-1])
+                        resp += "\n\n---\n⚠️ *Sesi ini mencapai batas. Jika kamu merasa terancam atau butuh dukungan segera, silakan hubungi **112 / 119** atau buka tab **Resources** untuk menemui tenaga profesional.*"
+                    else:
+                        resp = ai_response(ui.strip(), st.session_state.chat_history[:-1])
+                        
+                    st.session_state.chat_history.append({"role":"assistant","content":resp,"time":datetime.now().strftime("%H:%M")})
+                    st.rerun()
 
         st.markdown('<div class="bottom-spacer"></div>', unsafe_allow_html=True)
 
