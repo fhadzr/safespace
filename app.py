@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 from datetime import datetime
 
 st.set_page_config(
-    page_title="RK SafeSpace",
+    page_title="SafeSpace",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -307,6 +307,8 @@ import requests
 def ai_response(msg, hist):
     try:
         key = st.secrets.get("GROQ_API_KEY", "")
+        st.write("Key exists:", bool(key))
+        st.write("Prefix:", key[:8] if key else "NONE")
         if not key: 
             print("[Safe Support AI] GROQ_API_KEY not found in secrets.")
             return fallback(msg)
@@ -331,18 +333,20 @@ def ai_response(msg, hist):
             "Content-Type": "application/json"
         }
         payload = {
-            "model": "llama3-8b-8192", 
+            "model": "llama-3.1-8b-instant", 
             "messages": messages,
             "temperature": 0.5,
             "max_tokens": 512
         }
-        
+
+        st.write("Sending request...")
         res = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers=headers,
             json=payload,
             timeout=10
         )
+        st.write("Request finished")
 
         print("Status Code:", res.status_code)
         print("Response:", res.text)
@@ -571,7 +575,6 @@ else:
             st.markdown(f"""
             <div class="card">
               <p style="font-size:1rem;font-weight:600;color:#1a1a1a;line-height:1.5;margin:0;">{QUESTIONS[qi]}</p>
-              <p style="font-size:.75rem;color:#888;margin-top:8px;margin-bottom:0;">ⓘ Jawablah berdasarkan pengalaman 6 bulan terakhir.</p>
             </div>
             """, unsafe_allow_html=True)
             st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
